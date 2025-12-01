@@ -1,7 +1,7 @@
 import { inject, Injectable, signal } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { QuizletDataService } from './quizlet-data';
-import { catchError, debounceTime, distinctUntilChanged, of, switchMap, tap } from 'rxjs';
+import { debounceTime, distinctUntilChanged, switchMap } from 'rxjs';
 import { QuizletCard } from './quizlet-card';
 import { environment } from '../../environments/environment';
 import { GoogleGenerativeAI } from '@google/generative-ai';
@@ -18,25 +18,35 @@ export class SearchService {
 
   private readonly genAI = new GoogleGenerativeAI(environment.geminiApiKey);
 
-  public readonly searchResult = toObservable(this.query).pipe(
+  private readonly searchResult$ = toObservable(this.query).pipe(
     debounceTime(300),
     distinctUntilChanged(),
-    tap((query) => {
-      this.error.set(null);
-      // Only set loading to true if we have a non-empty query
-      if (query.trim()) {
-        this.loading.set(true);
+    switchMap(async (query) => {
+      // If the query is empty or just whitespace, do nothing and return null.
+      if (!query.trim()) {
+        return null;
       }
-    }),
-    switchMap(async (query) => this.search(query)),
-    catchError((err: Error) => {
-      this.error.set(err.message);
-      return of(null);
-    }),
-    tap(() => this.loading.set(false))
+
+      // A real search is happening. Manage the loading and error states.
+      try {
+        this.loading.set(true);
+        this.error.set(null);
+        // The search function now only handles the API call itself.
+        return await this.search(query);
+      } catch (err: any) {
+        console.error('Error in search switchMap:', err);
+        this.error.set(
+          'Failed to get an answer from the AI. Please try again.'
+        );
+        return null;
+      } finally {
+        // This GUARANTEES the loading spinner will be turned off after the search completes or fails.
+        this.loading.set(false);
+      }
+    })
   );
 
-  public readonly searchResultState = toSignal(this.searchResult, { initialValue: null });
+  public readonly searchResultState = toSignal(this.searchResult$);
   public readonly loadingState = this.loading.asReadonly();
   public readonly errorState = this.error.asReadonly();
 
@@ -44,11 +54,11 @@ export class SearchService {
     this.query.set(query);
   }
 
+  /**
+   * Performs the generative AI search. This function is now simpler and only
+   * focuses on the core task of interacting with the Google AI API.
+   */
   private async search(query: string): Promise<QuizletCard | null> {
-    if (!query.trim()) {
-      return null;
-    }
-
     const model = this.genAI.getGenerativeModel({ model: 'gemini-1.5-pro' });
     const quizletData = this.quizletDataService.getQuizletData();
     const prompt = `
@@ -64,19 +74,14 @@ export class SearchService {
       Answer:
     `;
 
-    try {
-      const result = await model.generateContent(prompt);
-      const response = result.response;
-      const definition = response.text();
+    const result = await model.generateContent(prompt);
+    const response = result.response;
+    const definition = response.text();
 
-      if (definition.trim() === 'NOT_FOUND') {
-        return null;
-      }
-
-      return { term: query, definition };
-    } catch (error) {
-      console.error('Error generating content:', error);
-      throw new Error('Failed to get an answer from the AI. Please try again.');
+    if (definition.trim() === 'NOT_FOUND') {
+      return null;
     }
+
+    return { term: query, definition };
   }
 }
