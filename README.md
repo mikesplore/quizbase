@@ -1,59 +1,73 @@
-# Myapp
+# QuizBase
 
-This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 20.3.11.
+A retrieval-locked assistant that searches Quizlet flashcards and returns exact answers. Type a question, get the answer directly from Quizlet — no AI hallucination, no external sources.
 
-## Development server
+## How It Works
 
-To start a local development server, run:
+1. **You type a question** — Enter any flashcard question in the search box
+2. **QuizBase searches Quizlet** — Uses Google Custom Search API to find matching flashcards on quizlet.com
+3. **Returns the exact answer** — Extracts and displays only the answer from the Quizlet flashcard
 
-```bash
-ng serve
+## Features
+
+- 🔒 **Retrieval-locked** — Answers come only from Quizlet, never generated
+- ⚡ **Fast search** — Finds flashcard answers in seconds
+- 🎯 **Exact matches** — Returns the precise answer from the flashcard
+- 🚫 **No hallucination** — If it's not on Quizlet, it says "Not found"
+
+## Setup
+
+### Prerequisites
+
+- Node.js 18+
+- Angular CLI
+- Google Cloud account (for APIs)
+
+### Environment Variables
+
+Create a `.env` file in the root directory:
+
+```env
+# Required: Gemini API Key
+GEMINI_API_KEY=your_gemini_api_key
+
+# Required: Google Custom Search API
+GOOGLE_SEARCH_API_KEY=your_google_search_api_key
+GOOGLE_SEARCH_ENGINE_ID=your_search_engine_id
 ```
 
-Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
+### Getting API Keys
 
-## Code scaffolding
+1. **Gemini API Key**
+   - Go to [Google AI Studio](https://aistudio.google.com/apikey)
+   - Create an API key
 
-Angular CLI includes powerful code scaffolding tools. To generate a new component, run:
+2. **Google Custom Search API**
+   - Create a [Programmable Search Engine](https://programmablesearchengine.google.com/)
+   - Enable "Search the entire web"
+   - Get the Search Engine ID (cx parameter)
+   - Enable [Custom Search API](https://console.cloud.google.com/apis/library/customsearch.googleapis.com) in Google Cloud
+   - Create an API key in [Credentials](https://console.cloud.google.com/apis/credentials)
 
-```bash
-ng generate component component-name
-```
-
-For a complete list of available schematics (such as `components`, `directives`, or `pipes`), run:
-
-```bash
-ng generate --help
-```
-
-## Building
-
-To build the project run:
+### Installation
 
 ```bash
-ng build
+# Install dependencies
+npm install
+
+# Start development server
+npm start
 ```
 
-This will compile your project and store the build artifacts in the `dist/` directory. By default, the production build optimizes your application for performance and speed.
+Open http://localhost:4200 in your browser.
 
-## Running unit tests
+## Tech Stack
 
-To execute unit tests with the [Karma](https://karma-runner.github.io) test runner, use the following command:
+- **Frontend**: Angular 20 with Signals
+- **Search**: Google Custom Search API
+- **AI Extraction**: Gemini 2.0 Flash
+- **Styling**: CSS with custom properties
 
-```bash
-ng test
-```
+## License
 
-## Running end-to-end tests
-
-For end-to-end (e2e) testing, run:
-
-```bash
-ng e2e
-```
-
-Angular CLI does not come with an end-to-end testing framework by default. You can choose one that suits your needs.
-
-## Additional Resources
-
-For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
+MIT

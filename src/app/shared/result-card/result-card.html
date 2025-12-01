@@ -1,4 +1,9 @@
-<div role="status" aria-live="polite">
-  <h2 class="result-term">{{ result().term }}</h2>
-  <p class="result-definition">{{ result().definition }}</p>
+<div class="result-card" role="status" aria-live="polite">
+  <div class="answer-section">
+    <p class="answer">{{ result().definition }}</p>
+  </div>
+  <div class="query-section">
+    <span class="query-label">Your question</span>
+    <p class="query-text">{{ result().term }}</p>
+  </div>
 </div>

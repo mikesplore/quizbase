@@ -2,26 +2,36 @@
 <main class="main">
   <div class="container">
     <header class="header">
-      <h1 class="title">Quizlet Assistant</h1>
-      <p class="subtitle">Your retrieval-locked AI assistant</p>
+      <h1 class="title">QuizBase</h1>
+      <p class="subtitle">Search Quizlet flashcards instantly</p>
     </header>
 
     <div class="search-container">
       <app-search-input (search)="onSearch($event)"></app-search-input>
     </div>
 
-    @if (searchResult | async; as result) {
-      @if(result) {
+    <div class="results-area">
+      @if (isLoading()) {
+        <div class="loading">
+          <div class="spinner"></div>
+          <p>Searching Quizlet...</p>
+        </div>
+      } @else if (error()) {
+        <div class="error-message">
+          <p>{{ error() }}</p>
+        </div>
+      } @else if (searchResult(); as result) {
         <app-result-card [result]="result"></app-result-card>
-      } @else {
+      } @else if (hasSearched()) {
         <div class="no-result">
-          <p>No result found. Please try another term.</p>
+          <p>No match found</p>
+          <span class="no-result-hint">Try a different question or check Quizlet directly.</span>
+        </div>
+      } @else {
+        <div class="welcome">
+          <p class="welcome-text">Enter a question to find answers from Quizlet</p>
         </div>
       }
-    } @else {
-      <div class="loading">
-        <p>Loading...</p>
-      </div>
-    }
+    </div>
   </div>
 </main>
