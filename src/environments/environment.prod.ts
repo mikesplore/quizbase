@@ -5,4 +5,6 @@
 export const environment = {
   production: true,
   geminiApiKey: '',
+  googleSearchApiKey: '',
+  googleSearchEngineId: '',
 };

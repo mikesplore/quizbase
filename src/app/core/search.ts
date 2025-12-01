@@ -24,8 +24,7 @@ export class SearchService {
         this.loading.set(true);
         this.error.set(null);
         return await this.searchQuizlet(query);
-      } catch (err: any) {
-        console.error('Search error:', err);
+      } catch {
         this.error.set('Search failed. Please try again.');
         return null;
       } finally {
@@ -44,8 +43,8 @@ export class SearchService {
 
   /**
    * Search Quizlet.com for flashcard answers.
-   * Primary: Use Gemini with Google Search grounding (can see Q&A snippets)
-   * Fallback: Use Custom Search API + page fetching
+   * Primary: Use Gemini with Google Search grounding
+   * Fallback: Use Custom Search API + Gemini extraction
    */
   private async searchQuizlet(query: string): Promise<QuizletCard | null> {
     const geminiKey = environment.geminiApiKey;
@@ -56,7 +55,7 @@ export class SearchService {
       throw new Error('Gemini API key not configured');
     }
 
-    // Try Gemini with grounding first - it can see Google's Q&A snippets
+    // Try Gemini with grounding first
     const groundingResult = await this.searchWithGeminiGrounding(query, geminiKey);
     if (groundingResult) {
       return groundingResult;
@@ -71,7 +70,7 @@ export class SearchService {
   }
 
   /**
-   * Use Google Custom Search API (restricted to quizlet.com) + Gemini extraction
+   * Use Google Custom Search API + Gemini extraction
    */
   private async searchWithCustomSearch(
     query: string,
@@ -79,11 +78,9 @@ export class SearchService {
     searchEngineId: string,
     geminiKey: string
   ): Promise<QuizletCard | null> {
-    // Try multiple search strategies for better coverage
-    // Add site:quizlet.com to ensure results are from Quizlet even if PSE has indexing issues
     const searchStrategies = [
-      `"${query}" site:quizlet.com`,  // Exact phrase + site restriction
-      `${query} site:quizlet.com`,    // Natural query + site restriction
+      `"${query}" site:quizlet.com`,
+      `${query} site:quizlet.com`,
     ];
 
     let items: any[] = [];
@@ -95,36 +92,22 @@ export class SearchService {
       searchUrl.searchParams.set('q', searchQuery);
       searchUrl.searchParams.set('num', '10');
 
-      console.log('Custom Search query:', searchQuery);
-
       const searchResponse = await fetch(searchUrl.toString());
-      if (!searchResponse.ok) {
-        const errorText = await searchResponse.text();
-        console.error('Custom Search API error:', errorText);
-        continue; // Try next strategy
-      }
+      if (!searchResponse.ok) continue;
 
       const searchData = await searchResponse.json();
       items = searchData.items || [];
 
-      console.log('Custom Search results:', items.length, 'items found');
-
-      if (items.length > 0) {
-        console.log('Search results:', JSON.stringify(items.slice(0, 2), null, 2));
-        break; // Found results, stop trying
-      }
+      if (items.length > 0) break;
     }
 
     if (items.length === 0) {
-      console.log('No results from any search strategy');
       return null;
     }
 
-    // Use search snippets and metadata to build context for Gemini
     const searchContext = items
       .map((item: any, i: number) => {
         let content = `[${i + 1}] ${item.title}\nSnippet: ${item.snippet}`;
-        // Include og:description which often has more flashcard content
         if (item.pagemap?.metatags?.[0]?.['og:description']) {
           content += `\nMore content: ${item.pagemap.metatags[0]['og:description']}`;
         }
@@ -132,7 +115,6 @@ export class SearchService {
       })
       .join('\n\n');
 
-    // Step 2: Use Gemini to extract the exact answer
     const geminiResponse = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`,
       {
@@ -179,8 +161,6 @@ ANSWER:`,
     const geminiData = await geminiResponse.json();
     const answer = geminiData.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
 
-    console.log('Gemini extracted answer:', answer);
-
     if (!answer || answer === 'NOT_FOUND' || answer.toLowerCase().includes('not found')) {
       return null;
     }
@@ -189,14 +169,12 @@ ANSWER:`,
   }
 
   /**
-   * Use Gemini with Google Search grounding - can see Q&A snippets from Google
+   * Use Gemini with Google Search grounding
    */
   private async searchWithGeminiGrounding(
     query: string,
     geminiKey: string
   ): Promise<QuizletCard | null> {
-    console.log('Trying Gemini grounding search...');
-    
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`,
       {
@@ -234,144 +212,16 @@ If you cannot find a clear Quizlet flashcard answer, respond with exactly: NOT_F
     );
 
     if (!response.ok) {
-      console.error('Gemini grounding API error:', response.status);
-      return null; // Don't throw, let it fall back to Custom Search
+      return null;
     }
 
     const data = await response.json();
-    console.log('Gemini grounding response received');
-
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-    console.log('Gemini grounding extracted:', text);
 
     if (!text || text === 'NOT_FOUND' || text.toLowerCase().includes('not found') || text.toLowerCase().includes('cannot find')) {
       return null;
     }
 
-    if (!text || text === 'NOT_FOUND' || text.toLowerCase().includes('not found')) {
-      return null;
-    }
-
     return { term: query, definition: text };
-  }
-
-  /**
-   * Fetch actual content from Quizlet pages to get flashcard data
-   */
-  private async fetchQuizletPages(items: any[]): Promise<string[]> {
-    const contents: string[] = [];
-
-    for (const item of items) {
-      try {
-        const url = item.link;
-        if (!url || !url.includes('quizlet.com')) continue;
-
-        console.log('Fetching Quizlet page:', url);
-
-        // Use a CORS proxy or fetch directly (may need server-side for production)
-        const response = await fetch(url, {
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (compatible; QuizBase/1.0)',
-          },
-        });
-
-        if (!response.ok) continue;
-
-        const html = await response.text();
-
-        // Extract flashcard data from the page
-        // Quizlet stores flashcard data in JSON within the page
-        const flashcardData = this.extractFlashcardsFromHtml(html);
-        
-        if (flashcardData) {
-          contents.push(flashcardData);
-          console.log('Extracted flashcard content from:', url);
-        }
-      } catch (err) {
-        console.warn('Failed to fetch Quizlet page:', item.link, err);
-      }
-    }
-
-    return contents;
-  }
-
-  /**
-   * Extract flashcard terms and definitions from Quizlet HTML
-   */
-  private extractFlashcardsFromHtml(html: string): string | null {
-    try {
-      // Quizlet embeds flashcard data in various formats
-      // Try to find JSON data in script tags
-      
-      // Pattern 1: Look for window.__NEXT_DATA__ (newer Quizlet)
-      const nextDataMatch = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
-      if (nextDataMatch) {
-        const data = JSON.parse(nextDataMatch[1]);
-        const cards = this.extractCardsFromNextData(data);
-        if (cards) return cards;
-      }
-
-      // Pattern 2: Look for Quizlet.setPageData or similar
-      const setPageDataMatch = html.match(/Quizlet\.setPageData\(([\s\S]*?)\);/);
-      if (setPageDataMatch) {
-        const data = JSON.parse(setPageDataMatch[1]);
-        const cards = this.extractCardsFromPageData(data);
-        if (cards) return cards;
-      }
-
-      // Pattern 3: Extract from visible text (fallback)
-      // Look for term-definition patterns in the HTML
-      const termMatches = html.matchAll(/<span class="[^"]*TermText[^"]*"[^>]*>([\s\S]*?)<\/span>/g);
-      const terms: string[] = [];
-      for (const match of termMatches) {
-        const text = match[1].replace(/<[^>]+>/g, '').trim();
-        if (text) terms.push(text);
-      }
-
-      if (terms.length >= 2) {
-        // Pair terms as question-answer
-        let result = '';
-        for (let i = 0; i < terms.length - 1; i += 2) {
-          result += `Q: ${terms[i]}\nA: ${terms[i + 1]}\n\n`;
-        }
-        return result;
-      }
-
-      return null;
-    } catch (err) {
-      console.warn('Failed to extract flashcards from HTML:', err);
-      return null;
-    }
-  }
-
-  private extractCardsFromNextData(data: any): string | null {
-    try {
-      // Navigate the NEXT_DATA structure to find flashcards
-      const studiableItems = data?.props?.pageProps?.dehydratedState?.queries
-        ?.find((q: any) => q.state?.data?.studiableItems)?.state?.data?.studiableItems;
-      
-      if (studiableItems && Array.isArray(studiableItems)) {
-        return studiableItems
-          .map((item: any) => `Q: ${item.cardSides?.[0]?.media?.[0]?.plainText || ''}\nA: ${item.cardSides?.[1]?.media?.[0]?.plainText || ''}`)
-          .join('\n\n');
-      }
-      return null;
-    } catch {
-      return null;
-    }
-  }
-
-  private extractCardsFromPageData(data: any): string | null {
-    try {
-      const terms = data?.termIdToTermsMap || data?.terms;
-      if (terms && typeof terms === 'object') {
-        return Object.values(terms)
-          .map((term: any) => `Q: ${term.word || term.term || ''}\nA: ${term.definition || ''}`)
-          .join('\n\n');
-      }
-      return null;
-    } catch {
-      return null;
-    }
   }
 }
