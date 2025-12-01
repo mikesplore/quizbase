@@ -1,6 +1,6 @@
 /**
  * This script loads environment variables from .env and generates
- * the Angular environment file with proper values.
+ * the Angular environment files with proper values.
  */
 const fs = require('fs');
 const path = require('path');
@@ -25,8 +25,8 @@ const geminiApiKey = envVars.GEMINI_API_KEY || process.env.GEMINI_API_KEY || '';
 const googleSearchApiKey = envVars.GOOGLE_SEARCH_API_KEY || process.env.GOOGLE_SEARCH_API_KEY || '';
 const googleSearchEngineId = envVars.GOOGLE_SEARCH_ENGINE_ID || process.env.GOOGLE_SEARCH_ENGINE_ID || '';
 
-// Generate environment.ts content
-const envContent = `/**
+// Generate development environment.ts
+const devEnvContent = `/**
  * Development environment configuration.
  * Auto-generated from .env file. Do not edit directly.
  */
@@ -38,11 +38,30 @@ export const environment = {
 };
 `;
 
-// Write to environment.ts
-const targetPath = path.join(__dirname, '..', 'src', 'environments', 'environment.ts');
-fs.writeFileSync(targetPath, envContent);
+// Generate production environment.prod.ts
+const prodEnvContent = `/**
+ * Production environment configuration.
+ * Auto-generated from .env file. Do not edit directly.
+ */
+export const environment = {
+  production: true,
+  geminiApiKey: '${geminiApiKey}',
+  googleSearchApiKey: '${googleSearchApiKey}',
+  googleSearchEngineId: '${googleSearchEngineId}',
+};
+`;
 
-console.log('✓ Environment file generated successfully');
+// Write to environment files
+const devTargetPath = path.join(__dirname, '..', 'src', 'environments', 'environment.ts');
+const prodTargetPath = path.join(__dirname, '..', 'src', 'environments', 'environment.prod.ts');
+
+fs.writeFileSync(devTargetPath, devEnvContent);
+fs.writeFileSync(prodTargetPath, prodEnvContent);
+
+console.log('✓ Environment files generated successfully');
+if (!geminiApiKey) {
+  console.log('⚠ WARNING: GEMINI_API_KEY not set - search will not work!');
+}
 if (!googleSearchApiKey || !googleSearchEngineId) {
-  console.log('⚠ Google Custom Search not configured - using Gemini grounding fallback');
+  console.log('⚠ Google Custom Search not configured - using Gemini grounding only');
 }

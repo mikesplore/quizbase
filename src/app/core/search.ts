@@ -24,8 +24,9 @@ export class SearchService {
         this.loading.set(true);
         this.error.set(null);
         return await this.searchQuizlet(query);
-      } catch {
-        this.error.set('Search failed. Please try again.');
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : 'Search failed. Please try again.';
+        this.error.set(message);
         return null;
       } finally {
         this.loading.set(false);
