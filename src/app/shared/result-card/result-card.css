@@ -1,0 +1,31 @@
+.result-card {
+  padding: 1.5rem;
+  background-color: #f8fafc;
+  border-left: 4px solid #3b82f6;
+  border-radius: 8px;
+  animation: fadeIn 0.5s ease-in-out;
+}
+
+.result-term {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #1e293b;
+  margin: 0 0 0.5rem;
+}
+
+.result-definition {
+  font-size: 1rem;
+  color: #334155;
+  line-height: 1.6;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

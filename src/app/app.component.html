@@ -1,0 +1,18 @@
+<header>
+  <h1>Retrieval-Locked Quizlet Assistant</h1>
+  <app-search-input (search)="onSearch($event)"></app-search-input>
+</header>
+
+<main>
+  @if (isLoading()) {
+    <div class="loading-spinner"></div>
+  } @else if (error()) {
+    <div class="error-message">{{ error() }}</div>
+  } @else if (searchResult(); as result) {
+    @if (result) {
+      <app-result-card [result]="result"></app-result-card>
+    } @else {
+      <div class="no-results">No results found. Please try a different question.</div>
+    }
+  }
+</main>
